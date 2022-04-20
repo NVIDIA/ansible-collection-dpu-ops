@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=arm64-sbsa&Compilation=Native&Distribution=Ubuntu&target_version=20.04&target_type=deb_network
+---
+- name: c_arch for aarch64
+  set_fact:
+    c_arch: sbsa
+    c_ver: "{{ ansible_distribution_version | regex_replace('\\.', '') }}"
+  when: ansible_architecture == 'aarch64'
+
+- name: c_arch for x86_64
+  set_fact:
+    c_arch: x86_64
+    c_ver: "{{ ansible_distribution_version | regex_replace('\\.', '') }}"
+  when: ansible_architecture == 'x86_64'
+
+# A024F6F0E6D6A281: Mellanox Technologies (Mellanox Technologies - Signing Key v3) <support@mellanox.com>
+# F60F4B3D7FA2AF80: cudatools <cudatools@nvidia.com
+- name: import gpg keys
+  copy:
+    src: "{{ item }}"
+    dest: "/etc/apt/trusted.gpg.d/{{ item }}"
+    mode: "0644"
+    owner: root
+    group: root
+  with_items:
+    - A024F6F0E6D6A281.gpg
+    - F60F4B3D7FA2AF80.gpg
+
+- name: /etc/apt/preferences.d/cuda-repository-pin-600
+  copy:
+    content: |
+      # https://help.ubuntu.com/community/PinningHowto
+      Package: nsight-compute
+      Pin: origin *ubuntu.com*
+      Pin-Priority: -1
+      
+      Package: nsight-systems
+      Pin: origin *ubuntu.com*
+      Pin-Priority: -1
+      
+      Package: *
+      Pin: release l=NVIDIA CUDA
+      Pin-Priority: 600
+
+    dest: /etc/apt/preferences.d/cuda-repository-pin-600
+    owner: root
+    group: root
+    mode: '0644'
+

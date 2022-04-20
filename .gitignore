@@ -1,0 +1,3 @@
+nvidia-dpu_ops-*.tar.gz
+**/__pycache__
+.cache

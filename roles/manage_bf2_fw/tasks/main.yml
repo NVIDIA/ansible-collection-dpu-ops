@@ -1,0 +1,62 @@
+###############################################################################
+#
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+#
+###############################################################################
+- name: FW update
+  shell: "/opt/mellanox/mlnx-fw-updater/mlnx_fw_updater.pl"
+  when:
+    - not force
+  changed_when:
+    - fw_update.rc == 0
+  failed_when:
+    - fw_update.rc == 1
+  register: fw_update
+
+- name: FW update - force
+  shell: "/opt/mellanox/mlnx-fw-updater/mlnx_fw_updater.pl --force-fw-update"
+  when:
+    - force
+  changed_when:
+    - fw_update.rc == 0
+  failed_when:
+    - fw_update.rc == 1
+  register: fw_update
+
+- name: reboot host
+  block:
+  - name: turn x86 host off
+    vars:
+      bmc_action: "chassis power off"
+    include_role:
+      name: bf_bmc
+
+  - name: Sleep for 1 minute to ensure power off
+    pause:
+      seconds: 60
+
+  - name: turn x86 host on
+    vars:
+      bmc_action: "chassis power on"
+    include_role:
+      name: bf_bmc
+  when: fw_update.changed in [0, 1]

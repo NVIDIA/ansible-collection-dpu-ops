@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Setup CUDA '(deb) network' repo
+---
+- name: copy cuda.list
+  copy:
+    content: |
+      deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu{{ c_ver }}/{{ c_arch }}/ /
+    dest: /etc/apt/sources.list.d/cuda.list
+    owner: root
+    group: root
+    mode: '0644'
+
+# TODO
+#  1. run modprobe nvidia; nvidia-smi to check it wors
+#  2. pre-condition: GPU as PCI device is present
+#  3. Install # nvidia-container-runtime if required
+#     https://nvidia.github.io/libnvidia-container/

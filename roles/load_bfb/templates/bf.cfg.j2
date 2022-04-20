@@ -1,0 +1,92 @@
+{% block preamble %}{% endblock %}
+bfb_modify_os()
+{
+{% block script_begin %}{%endblock %}
+
+# Glean the BOOTNIC from the mac passed in for configuring the bf.cfg
+# The devices are not renamed to p{0,1} until first boot
+HOST_MAC={{ boot_mac }}
+for p in /sys/class/net/*
+do
+    n=${p##*/}
+    # echo $d = $n
+    mac=$(cat $p/address)
+    if [ "$mac" != "$HOST_MAC" ] ; then
+            continue
+    fi
+    dev=$(readlink $p/device)
+    case "$dev" in
+        *MLNXBF17*)
+            DEVICE=OOB
+            PROVISION_IFC=oob_net0
+            ;;
+        *03:00*)
+            port=${dev##*03:00.}
+            DEVICE="NIC_P${port}"
+            PROVISION_IFC="eth${port}"
+            ;;
+        *)
+            echo "$dev unknown" >&2
+            ;;
+    esac
+    break
+done
+if [ -z "$DEVICE" ] ; then
+  DEVICE=OOB
+  PROVISION_IFC=oob_net0
+fi
+echo "DEVICE=$DEVICE ; PROVISION_IFC=$PROVISION_IFC"
+BOOTNIC=NET-${DEVICE}-IPV4
+
+# Note: This section section uses EOF (no slash) which will substitute $VARS
+cat << EOF > /mnt/etc/bf.cfg
+BOOT0=${BOOTNIC}
+BOOT1=DISK
+EOF
+
+# Note: this section will ensure that variables like passwords are not escaped, rendering them useless.
+# Because of that, there is no variable substituion from the finish template at BFB install. Please ensure
+# there are no variables in this user-data file blocks that are expected to be read at BFB install time.
+cat << \EOF > /mnt/var/lib/cloud/seed/nocloud-net/user-data
+#cloud-config
+{% block cloudinit %}
+{% endblock %}
+runcmd:
+  - [ grub-install ]
+  - [ /usr/bin/bfcfg ]
+{% block cloudinit_extra_commands %}{% endblock %}
+EOF
+
+# mst start
+# DEV=$(/bin/ls -1 /dev/mst/mt*pciconf0)
+DEV=03:00.0
+OWNERSHIP_STATUS=$(mlxconfig -d $DEV q INTERNAL_CPU_MODEL |awk '/INTERNAL_CPU_MODEL/ {print $2}')
+
+if [[ $OWNERSHIP_STATUS == 'EMBEDDED_CPU(1)' ]]; then
+    cat > /mnt/var/lib/cloud/seed/nocloud-net/network-config.orig << 'EOF'
+{% block embedded_network %}{% endblock %}
+EOF
+else
+    cat > /mnt/var/lib/cloud/seed/nocloud-net/network-config.orig << 'EOF'
+{% block separated_network %}{% endblock %}
+EOF
+fi
+
+[ -s /mnt/var/lib/cloud/seed/nocloud-net/network-config.orig ] && \
+ mv /mnt/var/lib/cloud/seed/nocloud-net/network-config.orig /mnt/var/lib/cloud/seed/nocloud-net/network-config
+
+# Set mtu for ovs ports
+cat << \EOF >> /mnt/etc/mellanox/mlnx-ovs.conf
+{% block ovs_config %}{% endblock %}
+EOF
+
+{% block script_end %}{% endblock %}
+
+}
+{% block postamble %}{% endblock %}
+
+# Do not remove these trailing spaces or cat bfb will not work
+ 
+ 
+ 
+ 

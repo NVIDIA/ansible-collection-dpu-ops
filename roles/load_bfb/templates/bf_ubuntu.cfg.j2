@@ -1,0 +1,42 @@
+{% extends "bf.cfg.j2" %}
+
+{% block preamble%}
+{% endblock %}
+
+{% block script_begin %}
+set +x
+{% endblock %}
+
+{% block cloudinit %}
+debug:
+  verbose: true
+timezone: "Etc/UTC"
+hostname: {{ ansible_hostname }}
+manage_etc_hosts: true
+users:
+  - name: ubuntu
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    passwd: {{ hashed_user_password }}
+    groups: [adm, audio, cdrom, dialout, dip, floppy, lxd, netdev, plugdev, sudo, video]
+{% endblock %}
+
+{% block cloudinit_extra_commands %}
+#  - [ systemctl, enable, rshim ]
+{% endblock %}
+
+{% block embedded_network %}
+{% endblock %}
+
+{% block separated_network %}
+{% endblock %}
+
+{% block ovs_config %}
+{% endblock %}
+
+{% block script_end %}
+{% endblock %}
+
+{% block postamble %}
+{% endblock %}

@@ -1,0 +1,93 @@
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+#  https://developer.nvidia.com/cuda-toolkit-archive
+#  1. CUDA installation methods:
+#    - deb (local)
+#    - deb (network)
+#    - runfile (local)
+#  2. NVidia container runtime
+#     https://nvidia.github.io/libnvidia-container/
+---
+
+- name: check 'mode' var
+  fail:
+    msg: "'mode' parameter isn't defined"
+  when:
+    - not mode is defined
+    - not (mode == "deb_local" or mode == "deb_network")
+
+- name: common apt settings
+  include_tasks: apt_common.yml
+
+- name: Add deb (local) repo
+  include_tasks: add_mirror_repo.yml
+  when: mode == 'deb_local'
+
+- name: Add deb (network) repo
+  include_tasks: deb_network.yml
+  when: mode == 'deb_network'
+
+# FIXME libnvidia_container depends on Internet access
+- name: Add NVidia container runtime repo
+  include_tasks: libnvidia_container.yml
+
+# Uninstall CUDA packages only incase it doesn't match new version
+- name: Gather the package facts
+  ansible.builtin.package_facts:
+    manager: auto
+
+# The error was: 'dict object' has no attribute 'cuda'
+- name: Get list of installed CUDA packages
+  set_fact:
+    has_cuda_ver: "{{ ansible_facts.packages['cuda'][0]['version'].split('-')[0] }}"
+    cuda_packages: "{{ ansible_facts.packages | map('regex_search', 'cuda-.*') |select('string') |list }}"
+  when: ansible_facts.packages.cuda is defined
+
+- name: No CUDA installed?
+  set_fact:
+    has_cuda_ver: "0.0.0"
+    cuda_packages: []
+  when: ansible_facts.packages.cuda is not defined
+
+- name: Print list of CUDA packages
+  ansible.builtin.debug:
+    var: cuda_packages
+
+- name: Uninstall CUDA packages
+  block:
+    - name: uninstall by list
+      apt:
+        name: "{{ cuda_packages | list }}"
+        state: absent 
+    - name: uninstall by name
+      apt:
+        name: ['cuda']
+        state: absent 
+    - name: unload nvidia.ko
+      shell: |
+        sudo modprobe -r nvidia
+  when: cuda_release != has_cuda_ver and has_cuda_ver != "0.0.0"
+
+#  when: not cuda_release is version(has_cuda_ver, '=') 
+#  when: "{{ not cuda_release is version(has_cuda_ver, '=') }}"
+
+- name: Update apt metadata
+  apt:
+    update_cache: yes
+- name: Install CUDA package
+  apt:
+    name: ['cuda']
+    state: present
+  register: cuda_pkg
+
+# nvbug 3584701
+# modprobe: ERROR: could not insert 'nvidia': Operation not permitted
+#- name: reload nvidia.ko
+#  shell: |
+#    modprobe nvidia
+#  when: cuda_pkg.changed
+
+- name: Install nvidia-container-runtime
+  apt:
+    name: ['nvidia-container-runtime']
+    state: present

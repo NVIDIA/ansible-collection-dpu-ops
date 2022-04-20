@@ -1,0 +1,62 @@
+﻿# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+---
+- name: get repo local fn
+  set_fact:
+    pkg_fn: "/var/www/cuda/{{ pkg_name[0] }}"
+    pkg_nn: "{{ pkg_name[0] | split('_') | first }}"
+    dst_dir: "/var/www/cuda/{{ cuda_release }}-{{ cuda_arch }}"
+- name: set md5sum_fn fact
+  set_fact:
+    md5sum_fn: "{{ dst_dir }}/md5sum.txt"
+
+#- name: check local copy of md5sum.txt
+#  stat:
+#    path: "{{ md5sum_fn }}"
+#  register: md5_st
+
+- name: prepare local
+  block:
+    # prepare destination folders
+    - name: mkdir
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      with_items:
+        - /var/www/cuda
+        - "{{ dst_dir }}"
+    - name: copy store md5sum.txt
+      copy:
+        content: "{{ md5.content }}"
+        dest: "{{ md5sum_fn }}"
+        mode: '0644'
+        owner: root
+        group: root
+#  when: not md5_st.stat.exists
+
+- name: download CUDA local installer
+  get_url:
+    url: "https://developer.download.nvidia.com/compute/cuda/{{ cuda_release }}/local_installers/{{ pkg_name[0] }}"
+    dest: "{{ pkg_fn }}"
+  register: pkg
+  # when: not (pkg_st.stat.islnk is defined)
+
+- name: check unpacked dir
+  stat:
+    path: "{{ dst_dir }}/var/{{ pkg_nn }}"
+  register: var_st
+- name: Unpack local installer
+  shell: |
+    dpkg --unpack --force-architecture --instdir={{ dst_dir }} {{ pkg_fn }}
+  args:
+    executable: /bin/bash
+    chdir: "{{ dst_dir }}"
+    creates: "{{ dst_dir }}/var/{{ pkg_nn }}"
+  register: unpack
+  when: pkg.changed or not (var_st.stat.exists)
+
+- name: debug
+  debug:
+    msg: "{{ unpack }}"

@@ -1,0 +1,112 @@
+###############################################################################
+#
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+#
+###############################################################################
+- name: set current_bf_ownership
+  set_fact:
+    current_bf_ownership: "{{ 'separated_host' if bf2_devices[0].ownership == 'separated' else 'embedded_cpu' }}"
+    new_ownership_val: "{{ 0 if new_bf_ownership == 'separated_host' else 1 }}"
+
+- name: set interface names on new ownership
+  set_fact:
+    new_interface: "{{ separated_port if new_bf_ownership == 'separated_host' else embedded_port }}"
+    old_interface: "{{ separated_port if current_bf_ownership == 'separated_host' else embedded_port }}"
+
+- name: var
+  debug:
+    msg: "Current: {{ current_bf_ownership }} New: {{ new_bf_ownership }}"
+
+- name: See if netplan exists
+  stat:
+    path: /etc/netplan/50-cloud-init.yaml
+  register: netplan_file
+
+- name: Fail if netplan does not exist
+  fail:
+    msg: /etc/netplan/50-cloud-init.yaml did not exist
+  when: not netplan_file.stat.exists
+
+- name: Change bf2 ownership
+  command: "{{ item }}"
+  with_items:
+    - "mlxconfig -y -d {{ bf2_devices[0].mst }} s INTERNAL_CPU_MODEL={{ new_ownership_val }}"
+    - "mlxconfig -y -d {{ bf2_devices[0].mst }}.1 s INTERNAL_CPU_MODEL={{ new_ownership_val }}"
+  when:
+    - current_bf_ownership != new_bf_ownership
+  register: set_output_ownership
+
+- name: Set ovs config for separated
+  lineinfile:
+    path: /etc/mellanox/mlnx-ovs.conf
+    regexp: CREATE_OVS_BRIDGES=.*$
+    line: CREATE_OVS_BRIDGES="no"
+  when:
+    - current_bf_ownership != new_bf_ownership and new_bf_ownership == 'separated_host'
+
+- name: cleanup ovs bridges
+  command: "/usr/bin/ovs-vsctl --if-exists del-br {{ item }}"
+  with_items:
+    - "ovsbr1"
+    - "ovsbr2"
+  when:
+    - current_bf_ownership != new_bf_ownership and new_bf_ownership == 'separated_host'
+
+- name: Update netplans - p0
+  ansible.builtin.replace:
+    path: "{{ item }}"
+    regexp: "{{ old_interface[0] }}:"
+    replace: "{{ new_interface[0] }}:"
+  with_items:
+    - /etc/netplan/50-cloud-init.yaml
+    - /etc/netplan/60-mlnx.yaml
+
+- name: Update netplans - p1
+  ansible.builtin.replace:
+    path: "{{ item }}"
+    regexp: "{{ old_interface[1] }}:"
+    replace: "{{ new_interface[1] }}:"
+  with_items:
+    - /etc/netplan/50-cloud-init.yaml
+    - /etc/netplan/60-mlnx.yaml
+
+- name: Set ovs config for embedded
+  lineinfile:
+    path: /etc/mellanox/mlnx-ovs.conf
+    regexp: CREATE_OVS_BRIDGES=.*$
+    line: CREATE_OVS_BRIDGES="yes"
+  when:
+    - current_bf_ownership != new_bf_ownership and new_bf_ownership == 'embedded_cpu'
+
+- name: update netplan
+  command: netplan generate
+
+- name: apply netplan
+  command: netplan apply
+
+- name: sync files to disk
+  command: sync
+
+- name: Set reboot flag
+  set_fact:
+    should_reboot: True
+  when: set_output_ownership.changed

@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+---
+- name: Check vars
+  include_tasks: check_vars.yml
+
+- name: Get local installer
+  include_tasks: get_installer.yml

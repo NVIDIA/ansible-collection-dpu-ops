@@ -1,0 +1,96 @@
+###############################################################################
+#
+# Copyright 2022 NVIDIA Corporation
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+# the Software, and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+###############################################################################
+## Ref: BLUEFIELD AS CONNECTX, Internal Architecture Spec
+# 5.2	Transition from SNIC mode to NIC mode
+#  Transition from SNIC mode (default) to NIC mode should be available from x86, w/o accessing Arm cores.
+#  1.	Install DPU ConnectX FW.
+#  2.	NV configurations should be applied
+#     a.	INTERNAL_CPU_PAGE_SUPPLIER = EXT_HOST_PF
+#     b.	INTERNAL_CPU_ESWITCH_MANAGER = EXT_HOST_PF
+#     c.	INTERNAL_CPU_IB_VPORT0 = EXT_HOST_PF
+#     d.	INTERNAL_CPU_OFFLOAD_ENGINE = DISABLED
+#  3.	Perform FW reset: mlxfwreset -d <dev> reset
+#     a.	Note, default reset flow (legacy/sub-1-sec) to be performed depends on system and device configurations.
+#     b.	It should be verified that if supported (mlxfwreset -d <dev> query), 
+#           both flows (legacy and sub-1-sec) should work and result in DPU device to be configured to DPU NIC mode.
+#
+# 5.2.1	Rshim host driver and Rshim PF aspect
+#  1.	Rshim host driver isn’t must to complete transition and operate in DPU NIC mode
+#  2.	The one who’d like to restrict Rshim PF should configure INTERNAL_CPU_RSHIM = DISABLED
+#     a.	Note: power cycle should be performed to apply such configuration
+#
+# 5.3 Transition from NIC mode back to SNIC mode (default) should include
+# ...
+#  3.	NV configurations to be applied
+#     a.	INTERNAL_CPU_PAGE_SUPPLIER = ECPF
+#     b.	INTERNAL_CPU_ESWITCH_MANAGER = ECPF
+#     c.	INTERNAL_CPU_IB_VPORT0 = ECPF
+#     d.	INTERNAL_CPU_OFFLOAD_ENGINE = ENABLED
+#     e.	If INTERNAL_CPU_RSHIM = DISABLED, need to configure INTERNAL_CPU_RSHIM = ENABLED
+#     i.	Note, power cycle should be performed if INTERNAL_CPU_RSHIM is configured
+#---
+# $ mlxconfig -d /dev/mst/mt41686_pciconf0 i
+#  ...
+# INTERNAL CPU CONF:
+#      INTERNAL_CPU_ESWITCH_MANAGER=<ECPF|EXT_HOST_PF>
+#      Defines the owner of Eth Embedded Switch responsibilities
+#                  0x0: ECPF
+#                  0x1: EXT_HOST_PF
+#      Valid for INTERNAL_CPU_MODEL = EMBEDDED_CPU
+---
+- name: nvconfig
+  set_fact:
+    nv: '{{ bf2_devices[0].nvconfig }}'
+
+- name: info
+  debug:
+    msg: |
+      New NIC mode: {{ dpu_nic_mode }}
+
+# if INTERNAL_CPU_MODEL                  SEPARATED_HOST(0)
+# "-E- The Device doesn't support INTERNAL_CPU_PAGE_SUPPLIER parameter"
+# so, we need to set INTERNAL_CPU_MODEL=EMBEDDED_CPU(1) before switching to ConnectX mode
+#
+- name: set nic_mode=ConnectX
+  block:
+    - include: set_embedded_cpu_model.yml
+      when: nv.INTERNAL_CPU_MODEL == "SEPARATED_HOST(0)"
+    - include: nvset.yml
+      with_dict:
+        - {INTERNAL_CPU_PAGE_SUPPLIER: 1}
+        - {INTERNAL_CPU_ESWITCH_MANAGER: 1}
+        - {INTERNAL_CPU_IB_VPORT0: 1}
+        - {INTERNAL_CPU_OFFLOAD_ENGINE: 1}
+  when: dpu_nic_mode == "ConnectX" or dpu_nic_mode == "CX"
+
+- name: set nic_mode=SmartNIC
+  block:
+    - include: set_embedded_cpu_model.yml
+      when: nv.INTERNAL_CPU_MODEL == "SEPARATED_HOST(0)"
+    - include: nvset.yml
+      with_dict:
+        - {INTERNAL_CPU_PAGE_SUPPLIER: 0}
+        - {INTERNAL_CPU_ESWITCH_MANAGER: 0}
+        - {INTERNAL_CPU_IB_VPORT0: 0}
+        - {INTERNAL_CPU_OFFLOAD_ENGINE: 0}
+  when: dpu_nic_mode == "SmartNIC" or dpu_nic_mode == "SNIC"

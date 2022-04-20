@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Setup CUDA '(deb) local' repo
+---
+- name: Get md5sum.txt from local mirror
+  uri:
+    url: "{{ foreman.foreman_mirror }}/cuda/{{ cuda_release }}-{{ cuda_arch }}/md5sum.txt"
+    return_content: true
+  # failed_when: false
+  register: md5
+- name: Check metadata status
+  fail:
+    msg: "No md5sum.txt found for CUDA {{ cuda_release }}-{{ cuda_arch }} in local mirror"
+  when:
+    - md5.status == 404
+
+- name: set dist_ver fact
+  set_fact:
+    dist_ver: "{{ ansible_distribution | lower }}{{ ansible_distribution_version | regex_replace('\\.', '') }}"
+    # ubuntu2004, ubuntu1804, ...
+# cuda-repo-ubuntu2004-11-5-local_11.5.2-495.29.05-1_amd64.deb
+- name: get repo package pattern
+  set_fact:
+    pkg_pattern: 'cuda-repo-{{ dist_ver }}-.*_{{ cuda_arch }}.deb'
+- name: get repo package
+  set_fact:
+    pkg_name: "{{ md5.content.splitlines() | map('regex_search', pkg_pattern) |select('string') |list }}"
+  failed_when: pkg_name |count != 1
+- name: get repo local fn
+  set_fact:
+    pkg_nn: "{{ pkg_name[0] | split('_') | first }}"
+
+- name: copy cuda.list
+  copy:
+    content: |
+      deb {{ foreman.foreman_mirror }}/cuda/{{ cuda_release }}-{{ cuda_arch }}/var/{{ pkg_nn }} ./
+    dest: /etc/apt/sources.list.d/cuda-repo.list
+    owner: root
+    group: root
+    mode: '0644'

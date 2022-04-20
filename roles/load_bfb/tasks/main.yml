@@ -1,0 +1,127 @@
+###############################################################################
+#
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+#
+###############################################################################
+- name: Load BFB from x86 host
+  block:
+    - name: get facts
+      bf2_facts:
+      when: bf2_devices is not defined
+      delegate_to: "{{ x86_host }}"
+
+    - name: Verify rshim is active on host
+      assert:
+        that: "{{ bf2_devices | nvidia.dpu_ops.get_rshim(rshim.dev) | length > 0 }}"
+        fail_msg: >
+          rshim is not active on the host, which could mean that either
+          the BMC on the BF2 card owns the rshim or it is just disabled on the host.
+          Please verify the state of your host and BF2 card before proceeding.
+      delegate_to: "{{ x86_host }}"
+
+    - name: Generate bf.cfg
+      template:
+        src: "{{ bfcfg_template }}"
+        dest: /tmp/bf.cfg
+        owner: root
+        group: root
+        mode: "0755"
+      delegate_to: "{{ x86_host }}"
+
+    - name: Load bfb into bf2
+      shell: "bfb-install --bfb {{ local_bfb }} --config /tmp/bf.cfg --rshim {{ rshim.dev }}"
+      delegate_to: "{{ x86_host }}"
+
+    - name: Delete temporary bf.cfg
+      file:
+        path: /tmp/bf.cfg
+        state: absent
+      delegate_to: "{{ x86_host }}"
+  when: is_bmc is false
+
+- name: Load BFB from BMC rshim
+  block:
+    - name: get rshim from BMC
+      raw: 'find /dev -maxdepth 1 -name "rshim*"'
+      register: rshim_output_bmc
+
+    - name: Verify rshim is active on BMC
+      assert:
+        that: rshim_output_bmc.stdout_lines|length > 0
+        fail_msg: >
+          rshim is not active on the BMC, which could mean that either the x86 host
+          owns the rshim or it is just disabled on the BMC.
+          Please verify the state of your host and BF2 card before proceeding.
+
+    - name: delete directory to ensure it is empty
+      file:
+        state: absent
+        path: "{{ local_bfb | dirname }}/{{ boot_mac }}"
+        owner: root
+        group: root
+        mode: "0755"
+      delegate_to: "{{ x86_host }}"
+
+    - name: Create directory to append the files
+      file:
+        state: directory
+        path: "{{ local_bfb | dirname }}/{{ boot_mac }}"
+        owner: root
+        group: root
+        mode: "0755"
+      delegate_to: "{{ x86_host }}"
+
+    - name: Copy bf.cfg for appending
+      copy:
+        src: "{{ local_bfb }}"
+        dest: "{{ local_bfb | dirname }}/{{ boot_mac }}"
+        owner: root
+        group: root
+        mode: "0755"
+        remote_src: true
+      delegate_to: "{{ x86_host }}"
+
+    - name: Generate bf.cfg
+      template:
+        src: "{{ bfcfg_template }}"
+        dest: "{{ local_bfb | dirname }}/{{ boot_mac }}/bf.cfg"
+        owner: root
+        group: root
+        mode: "0755"
+      delegate_to: "{{ x86_host }}"
+
+    - name: Assemble combined file
+      assemble:
+        src: "{{ local_bfb | dirname }}/{{ boot_mac }}"
+        dest: "{{ local_bfb | dirname }}/{{ boot_mac }}/bfb-and-config.bfb"
+        owner: root
+        group: root
+        mode: "0755"
+      delegate_to: "{{ x86_host }}"
+
+    - name: Load bfb into bf2
+      raw: "wget --no-check-certificate {{ bfb_url | dirname }}/{{ boot_mac }}/bfb-and-config.bfb -O /dev/rshim0/boot"
+      retries: 10
+      delay: 1
+      register: result
+      until: result.rc == 0
+  when: is_bmc is true

@@ -1,0 +1,2 @@
+SUBSYSTEM=="net", ACTION=="add", NAME=="p0", RUN+="/sbin/ethtool -s p0 {{ p0_nic_speed_options }}"
+SUBSYSTEM=="net", ACTION=="add", NAME=="p1", RUN+="/sbin/ethtool -s p1 {{ p1_nic_speed_options }}"

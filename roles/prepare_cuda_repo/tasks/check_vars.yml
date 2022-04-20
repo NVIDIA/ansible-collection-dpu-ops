@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+---
+- name: cuda_release is defined?
+  fail:
+    msg: "Value of cuda_release isn't defined"
+  when:
+    - not cuda_release is defined
+- name: cuda_arch is defined?
+  fail:
+    msg: "Value of cuda_arch isn't defined"
+  when:
+    - not cuda_arch is defined
+- name: cuda_arch is correct?
+  fail:
+    msg: "Value of cuda_arch ({{ cuda_arch }}) isn't correct"
+  when:
+    - not (cuda_arch == "arm64" or cuda_arch == "amd64")
+- name: cuda_dist is defined?
+  fail:
+    msg: "Value of cuda_dist isn't defined"
+  when:
+    - not cuda_dist is defined
+- name: set facts
+  set_fact:
+    # ubuntu2004, ubuntu1804, ...
+    # We can't guess OS distro by `ansible_distribution` from the Foreman host
+    # it won't match OS distro running on DPU or x86 host in general
+    # dist_ver: "{{ ansible_distribution | lower }}{{ ansible_distribution_version | regex_replace('\\.', '') }}"
+    dist_ver: "{{ cuda_dist | lower | regex_replace('[-\\.]', '') }}"
+
+- name: Get CUDA release metadata
+  uri:
+    url: "https://developer.download.nvidia.com/compute/cuda/{{ cuda_release }}/docs/sidebar/md5sum.txt"
+    return_content: true
+  failed_when: false
+  register: md5
+
+- name: Check metadata status
+  fail:
+    msg: "No metadata found for CUDA release {{ cuda_release }}"
+  when:
+    - md5.status == 404
+
+# cuda-repo-ubuntu2004-11-5-local_11.5.2-495.29.05-1_amd64.deb
+- name: get repo package pattern
+  set_fact:
+    pkg_pattern: 'cuda-repo-{{ dist_ver }}-.*_{{ cuda_arch }}.deb'
+- name: get repo package
+  set_fact:
+    pkg_name: "{{ md5.content.splitlines() | map('regex_search', pkg_pattern) |select('string') |list }}"
+  failed_when: pkg_name |count != 1

@@ -1,0 +1,13 @@
+exclude_paths:
+  - ./collections/
+  - ./.venv/
+  - ./.cache
+  - ./.git
+
+# https://github.com/ansible-community/ansible-lint/blob/master/src/ansiblelint/constants.py
+skip_list:  
+  - '204'  # Lines should be no longer than 160
+  - '301'  # Commands should not change things if nothing needs
+  - '302'  # Using command rather than an argument to e.g.
+  - '305'  # Use shell only when shell functionality is required      
+  - '503'  # Tasks that run when changed should likely be handlers
