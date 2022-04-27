@@ -27,7 +27,7 @@
     - name: Stop rshim on {{ bmc_host }}
       raw: systemctl stop rshim; systemctl mask rshim
       delegate_to: "{{ bmc_host }}"
-      become: True
+      become: true
 
     - name: Wait 5 seconds
       pause:
@@ -36,7 +36,7 @@
     - name: Restart rshim on {{ x86_host }}
       raw: systemctl restart rshim
       delegate_to: "{{ x86_host }}"
-      become: True
+      become: true
   when: current_rshim_owner == 'bmc'
 
 - name: Rshim move from x86 to bmc
@@ -44,7 +44,7 @@
     - name: Stop rshim on {{ x86_host }}
       raw: systemctl stop rshim
       delegate_to: "{{ x86_host }}"
-      become: True
+      become: true
 
     - name: Wait 5 seconds
       pause:
@@ -53,7 +53,7 @@
     - name: Start rshim on {{ bmc_host }}
       raw: systemctl unmask rshim; systemctl enable rshim; systemctl start rshim
       delegate_to: "{{ bmc_host }}"
-      become: True
+      become: true
 
     - name: Wait 5 seconds
       pause:
@@ -62,5 +62,5 @@
     - name: Start rshim on {{ x86_host }}
       raw: systemctl start rshim
       delegate_to: "{{ x86_host }}"
-      become: True
+      become: true
   when: current_rshim_owner == 'x86'

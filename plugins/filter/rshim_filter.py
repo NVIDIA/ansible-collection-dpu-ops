@@ -1,5 +1,3 @@
-###############################################################################
-#
 # SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
@@ -22,10 +20,16 @@
 # DEALINGS IN THE SOFTWARE.
 #
 ###############################################################################
-
+r'''
+`get_rshim` filter implementation
+'''
 def get_rshim(bf2_devices, rshim):
+    "returns list of rshim devices"
     return [f for f in bf2_devices if f['rshim'] == rshim]
 
-class FilterModule(object):
+
+class FilterModule:
+    """Ansible filter `get_rshim`"""
     def filters(self):
-        return { 'get_rshim': get_rshim, }
+        'return dict pointing at function'
+        return {'get_rshim': get_rshim,}

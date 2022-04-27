@@ -58,17 +58,17 @@
     - name: uninstall by list
       apt:
         name: "{{ cuda_packages | list }}"
-        state: absent 
+        state: absent
     - name: uninstall by name
       apt:
         name: ['cuda']
-        state: absent 
+        state: absent
     - name: unload nvidia.ko
       shell: |
         sudo modprobe -r nvidia
   when: cuda_release != has_cuda_ver and has_cuda_ver != "0.0.0"
 
-#  when: not cuda_release is version(has_cuda_ver, '=') 
+#  when: not cuda_release is version(has_cuda_ver, '=')
 #  when: "{{ not cuda_release is version(has_cuda_ver, '=') }}"
 
 - name: Update apt metadata

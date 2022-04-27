@@ -39,7 +39,7 @@
 
     - name: reboot bf2
       shell: echo "SW_RESET 1" > {{ rshim.dev }}/misc
-      become: yes
+      become: true
   when: is_bmc is false
 
 - name: reboot armos from the BMC
