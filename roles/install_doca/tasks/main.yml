@@ -34,7 +34,7 @@
 
 - name: Remove old doca packages
   apt:
-    update_cache: yes
+    update_cache: true
     state: absent
     name:
       - doca-sdk
@@ -44,7 +44,7 @@
 
 - name: Install doca packages
   apt:
-    update_cache: yes
+    update_cache: true
     name:
       - doca-sdk
       - doca-runtime

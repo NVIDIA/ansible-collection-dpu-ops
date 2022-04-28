@@ -9,10 +9,10 @@
   set_fact:
     md5sum_fn: "{{ dst_dir }}/md5sum.txt"
 
-#- name: check local copy of md5sum.txt
-#  stat:
-#    path: "{{ md5sum_fn }}"
-#  register: md5_st
+# - name: check local copy of md5sum.txt
+#   stat:
+#     path: "{{ md5sum_fn }}"
+#   register: md5_st
 
 - name: prepare local
   block:

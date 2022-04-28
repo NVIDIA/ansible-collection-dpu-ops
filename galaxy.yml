@@ -41,7 +41,7 @@ description: DPU Ops
 license:
 - MIT
 
-license_file: LICENSE
+# license_file: LICENSE
 
 tags: []
 
@@ -55,4 +55,8 @@ homepage: https://github.com/NVIDIA/ansible-collection-dpu-ops
 
 issues: https://github.com/NVIDIA/ansible-collection-dpu-ops/issues
 
-build_ignore: []
+build_ignore:
+  - '*.tar.gz'
+  - plugins/modules/bf2_facts_test.py
+  - poetry.lock
+  - pyproject.toml

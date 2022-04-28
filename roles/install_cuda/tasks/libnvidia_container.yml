@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# 
+#
 # https://nvidia.github.io/libnvidia-container/
 ---
 - name: set facts
@@ -11,19 +11,19 @@
   register: st_pgpkey
 - name: copy/install pgpkey
   block:
-  - name: install pgp key
-    copy:
-      src: libnvidia-container.pub.pem
-      dest: /root/libnvidia-container-gpgkey.pem
-      mode: '0640'
-      owner: root
-      group: root
-    register: gpgkey
+    - name: install pgp key
+      copy:
+        src: libnvidia-container.pub.pem
+        dest: /root/libnvidia-container-gpgkey.pem
+        mode: '0640'
+        owner: root
+        group: root
+      register: gpgkey
 
-  - name: import pgp key
-    shell:
-      apt-key add /root/libnvidia-container-gpgkey.pem
-    when: gpgkey.changed
+    - name: import pgp key
+      shell:
+        apt-key add /root/libnvidia-container-gpgkey.pem
+      when: gpgkey.changed
   when: not (st_pgpkey.stat.islnk is defined)
 #- name: fetch pgp key
 #  fetch:
