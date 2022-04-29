@@ -26,6 +26,8 @@
   with_items:
     - A024F6F0E6D6A281.gpg
     - F60F4B3D7FA2AF80.gpg
+    - A4B469963BF863CC.gpg
+    - 7fa2af80.gpg
 
 - name: /etc/apt/preferences.d/cuda-repository-pin-600
   copy:
