@@ -30,10 +30,10 @@
   debug:
     msg: "Current: {{ current_bf_mode }} New: {{ new_bf_mode }}"
 
-- name: Set mode to restricted
+    - name: Set mode to zero-trust
   command: "mlxprivhost -d {{ bf2_devices[0].mst }} r {{ mode_options }}"
   when:
-    - new_bf_mode == 'restricted'
+    - (new_bf_mode == 'restricted') or (new_bf_mode == 'zero-trust')
     - current_bf_mode != new_bf_mode
   register: mode_change_restricted
 

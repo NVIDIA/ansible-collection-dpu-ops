@@ -14,11 +14,10 @@ Ansible variable(s) to be defined:
 * `new_bf_mode`  - is used set restricted mode and block the host from accessing the DPU
   Allowed values are:
   * `privileged`
-  * `restricted`
+  * `zero-trust`
 
-* `new_bf_ownership` - the DPU may be placed in either separated or embedded ownership mode. 
+* `new_bf_ownership` - the DPU may be placed into embedded ownership mode. 
   Allowed values are:
-  * `SEPARATED_HOST`
   * `EMBEDDED_CPU`
  
 ## Playbook examples
@@ -32,7 +31,7 @@ Ansible variable(s) to be defined:
   pre_tasks:
     - name: Check for required variables
       fail:
-        msg: "Invalid security mode, new_bf_mode should either be restricted or privileged"
+        msg: "Invalid security mode, new_bf_mode should either be zero-trust or privileged"
       when: new_bf_mode not in bf2.security_modes
   vars:
     bmc_host: "{{ hostvars[non_bf2_host]['bmc_ip'] }}"
